@@ -1,152 +1,142 @@
+// frontend/app/page.tsx
 "use client";
 
-import Image from "next/image";
-import { useState } from "react";
-import { sendQuery } from "./lib/api";
+import { useState, FormEvent } from "react";
 
-export default function Home() {
-  const [query, setQuery] = useState("");
-  const [answer, setAnswer] = useState("");
-  const [loading, setLoading] = useState(false);
+interface Message {
+  text: string;
+  isUser: boolean;
+}
 
-  const handleQuery = async () => {
-    setLoading(true);
-    try {
-      const response = await sendQuery({
-        tenant_id: "demo_tenant",
-        query: query || "Hola"
-      });
-      setAnswer(response.answer);
-    } catch (err: any) {
-      console.error(err);
-      setAnswer("Error al consultar la API");
-    } finally {
-      setLoading(false);
+export default function ChatPage() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const [file, setFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState("");
+  
+  const TENANT_ID = "cliente_universidad_xyz"; 
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setFile(e.target.files[0]);
     }
   };
 
+  const handleUpload = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!file) {
+      setUploadMessage("Por favor, selecciona un archivo.");
+      return;
+    }
+    setIsUploading(true);
+    setUploadMessage(`Subiendo ${file.name}...`);
+
+    const formData = new FormData();
+    formData.append("tenant_id", TENANT_ID);
+    formData.append("file", file);
+
+    try {
+      const response = await fetch("http://34.68.200.26:8000/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || "Error al subir el archivo.");
+      }
+      setUploadMessage(`✅ Archivo ${file.name} subido con éxito!`);
+    } catch (error) { // <-- INICIO DE LA CORRECCIÓN 1
+      if (error instanceof Error) {
+        setUploadMessage(`❌ Error: ${error.message}`);
+      } else {
+        setUploadMessage(`❌ Ocurrió un error desconocido.`);
+      }
+    } finally { // <-- FIN DE LA CORRECCIÓN 1
+      setIsUploading(false);
+      setFile(null);
+    }
+  };
+
+  const handleQuerySubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+
+    const userMessage: Message = { text: input, isUser: true };
+    setMessages((prev) => [...prev, userMessage]);
+    setIsLoading(true);
+    setInput("");
+
+    try {
+      const response = await fetch("http://34.68.200.26:8000/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tenant_id: TENANT_ID,
+          query: input,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const agentMessage: Message = { text: data.answer, isUser: false };
+      setMessages((prev) => [...prev, agentMessage]);
+
+    } catch (error) { // <-- INICIO DE LA CORRECCIÓN 2
+      console.error("Failed to fetch agent response:", error);
+      let errorMessageText = "Lo siento, hubo un error al conectar con el agente.";
+      if (error instanceof Error) {
+        errorMessageText = `Error: ${error.message}`;
+      }
+      const errorMessage: Message = { text: errorMessageText, isUser: false };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally { // <-- FIN DE LA CORRECCIÓN 2
+      setIsLoading(false);
+    }
+  };
+
+  // ... (el resto del código JSX no cambia)
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        {/* Contenido original */}
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div style={{ fontFamily: 'sans-serif', maxWidth: '1200px', margin: '0 auto', padding: '20px', display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '40px' }}>
+      <div>
+        <h2>Base de Conocimiento Privada</h2>
+        <form onSubmit={handleUpload}>
+          <h3>Subir Documento</h3>
+          <input type="file" onChange={handleFileChange} accept=".pdf,.txt,.docx" />
+          <button type="submit" disabled={isUploading || !file} style={{ marginTop: '10px', padding: '8px 16px' }}>
+            {isUploading ? "Subiendo..." : "Subir Archivo"}
+          </button>
+          {uploadMessage && <p style={{ marginTop: '10px' }}>{uploadMessage}</p>}
+        </form>
+      </div>
+      <div>
+        <h1>Agente de Cumplimiento IES</h1>
+        <div style={{ height: '600px', border: '1px solid #ccc', borderRadius: '8px', padding: '10px', overflowY: 'auto', marginBottom: '10px', display: 'flex', flexDirection: 'column' }}>
+          {messages.map((msg, index) => (
+            <div key={index} style={{ alignSelf: msg.isUser ? 'flex-end' : 'flex-start', background: msg.isUser ? '#dcf8c6' : '#f1f0f0', borderRadius: '10px', padding: '8px 12px', margin: '5px', maxWidth: '70%' }}>
+              <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{msg.text}</p>
+            </div>
+          ))}
+         {isLoading && <div style={{ alignSelf: 'flex-start', fontStyle: 'italic', color: '#888' }}>El agente está pensando...</div>}
         </div>
-
-        {/* --------------------------- */}
-        {/* Formulario de prueba API */}
-        <div className="w-full max-w-md mt-8 p-4 border rounded">
-          <h2 className="text-lg font-bold mb-2">Test API</h2>
+        <form onSubmit={handleQuerySubmit} style={{ display: 'flex' }}>
           <input
             type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Escribe tu consulta"
-            className="border p-2 mr-2 w-full"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Escribe tu consulta aquí..."
+            style={{ flexGrow: 1, padding: '10px', borderRadius: '8px', border: '1px solid #ccc' }}
           />
-          <button
-            onClick={handleQuery}
-            disabled={loading}
-            className="bg-blue-500 text-white px-4 py-2 rounded mt-2"
-          >
-            {loading ? "Consultando..." : "Enviar Consulta"}
+          <button type="submit" disabled={isLoading} style={{ padding: '10px 20px', marginLeft: '10px', borderRadius: '8px', border: 'none', background: '#007bff', color: 'white', cursor: 'pointer' }}>
+            Enviar
           </button>
-          <p className="mt-4">Respuesta: {answer}</p>
-        </div>
-        {/* --------------------------- */}
-      </main>
-
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        {/* Footer original */}
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        </form>
+      </div>
     </div>
   );
 }
