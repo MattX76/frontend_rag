@@ -17,7 +17,7 @@ export default function ChatPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState("");
   
-  const TENANT_ID = "cliente_universidad_xyz"; 
+  const TENANT_ID = "cliente_universidad_xyz"; // (opcional: llévalo a NEXT_PUBLIC_TENANT_ID)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -39,7 +39,8 @@ export default function ChatPage() {
     formData.append("file", file);
 
     try {
-      const response = await fetch("http://34.68.200.26:8000/upload", {
+      // ⬇️ ANTES: http://34.68.200.26:8000/upload
+      const response = await fetch("/api/upload", {
         method: "POST",
         body: formData,
       });
@@ -48,13 +49,13 @@ export default function ChatPage() {
         throw new Error(data.detail || "Error al subir el archivo.");
       }
       setUploadMessage(`✅ Archivo ${file.name} subido con éxito!`);
-    } catch (error) { // <-- INICIO DE LA CORRECCIÓN 1
+    } catch (error) {
       if (error instanceof Error) {
         setUploadMessage(`❌ Error: ${error.message}`);
       } else {
         setUploadMessage(`❌ Ocurrió un error desconocido.`);
       }
-    } finally { // <-- FIN DE LA CORRECCIÓN 1
+    } finally {
       setIsUploading(false);
       setFile(null);
     }
@@ -70,24 +71,26 @@ export default function ChatPage() {
     setInput("");
 
     try {
-      const response = await fetch("http://34.68.200.26:8000/query", {
+      // ⬇️ ANTES: http://34.68.200.26:8000/query
+      const response = await fetch("/api/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tenant_id: TENANT_ID,
-          query: input,
+          query: userMessage.text, // usar el valor ya capturado
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`Error: ${response.statusText}`);
+        const text = await response.text().catch(() => "");
+        throw new Error(text || `Error: ${response.statusText}`);
       }
 
       const data = await response.json();
       const agentMessage: Message = { text: data.answer, isUser: false };
       setMessages((prev) => [...prev, agentMessage]);
 
-    } catch (error) { // <-- INICIO DE LA CORRECCIÓN 2
+    } catch (error) {
       console.error("Failed to fetch agent response:", error);
       let errorMessageText = "Lo siento, hubo un error al conectar con el agente.";
       if (error instanceof Error) {
@@ -95,12 +98,11 @@ export default function ChatPage() {
       }
       const errorMessage: Message = { text: errorMessageText, isUser: false };
       setMessages((prev) => [...prev, errorMessage]);
-    } finally { // <-- FIN DE LA CORRECCIÓN 2
+    } finally {
       setIsLoading(false);
     }
   };
 
-  // ... (el resto del código JSX no cambia)
   return (
     <div style={{ fontFamily: 'sans-serif', maxWidth: '1200px', margin: '0 auto', padding: '20px', display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '40px' }}>
       <div>
@@ -122,7 +124,7 @@ export default function ChatPage() {
               <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{msg.text}</p>
             </div>
           ))}
-         {isLoading && <div style={{ alignSelf: 'flex-start', fontStyle: 'italic', color: '#888' }}>El agente está pensando...</div>}
+          {isLoading && <div style={{ alignSelf: 'flex-start', fontStyle: 'italic', color: '#888' }}>El agente está pensando...</div>}
         </div>
         <form onSubmit={handleQuerySubmit} style={{ display: 'flex' }}>
           <input
