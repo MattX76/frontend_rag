@@ -11,18 +11,13 @@ interface QueryResponse {
 }
 
 // URL de tu API (puedes usar variable de entorno en Vercel)
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://34.68.200.26:8000/query";
-
-// Función para enviar la consulta a tu API
-export async function sendQuery(payload: QueryPayload): Promise<QueryResponse> {
-  const response = await fetch(API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
-  });
-
+const res = await fetch('/api/query', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  // quita credentials si no usas cookies/sesión
+  credentials: 'include',
+  body: JSON.stringify(payload)
+});
   if (!response.ok) {
     throw new Error(`Error al consultar la API: ${response.statusText}`);
   }
